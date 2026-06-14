@@ -15,13 +15,15 @@ interface Macro {
 }
 
 interface LogEntry {
+  id: string;
   foodName: string;
-  macros: {
-    calories: number;
-    protein: number;
-    carbs: number;
-    fat: number;
-  };
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  grams: number;
+  source: string;
+  loggedAt: string;
 }
 
 interface Message {
@@ -31,12 +33,25 @@ interface Message {
 
 interface Props {
   macros: Macro;
-  logs: LogEntry[];
+  logData: { logs: LogEntry[] } | undefined;
   isOpen: boolean;
   onClose: () => void;
 }
 
-export default function AISuggestions({ macros, logs, isOpen, onClose }: Props) {
+export default function AISuggestions({ macros, logData, isOpen, onClose }: Props) {
+  // Derive logs and logsReady from the same object in the same render.
+  // This eliminates the race condition entirely.
+  const logsReady = logData !== undefined;
+  const logs = logData?.logs?.map(l => ({
+    foodName: l.foodName,
+    macros: {
+      calories: l.calories,
+      protein: l.protein,
+      carbs: l.carbs,
+      fat: l.fat,
+    },
+  })) ?? [];
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -47,30 +62,31 @@ export default function AISuggestions({ macros, logs, isOpen, onClose }: Props) 
     requestCount: 0,
   });
   const bottomRef = useRef<HTMLDivElement>(null);
-
-  // Keep a ref to the latest logs and macros so the initial-open
-  // useEffect always reads the current values, not a stale closure.
-  const logsRef = useRef(logs);
-  const macrosRef = useRef(macros);
-  useEffect(() => { logsRef.current = logs; }, [logs]);
-  useEffect(() => { macrosRef.current = macros; }, [macros]);
+  const hasAutoSent = useRef(false);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Fire the initial suggestion only once when the panel opens.
-  // We use a small delay so React Query has time to populate logs
-  // before we fire the request.
+  // Fire the initial message only once, only after panel is open
+  // AND logData has resolved. Both conditions checked from the same render.
   useEffect(() => {
-    if (!isOpen || messages.length > 0) return;
-    const timer = setTimeout(() => {
-      sendMessage("Give me suggestions based on what I've eaten today.", logsRef.current, macrosRef.current);
-    }, 100);
-    return () => clearTimeout(timer);
+    if (isOpen && logsReady && !hasAutoSent.current) {
+      hasAutoSent.current = true;
+      console.log('AUTO SEND - logs:', logs, 'logData:', logData); // trouvleshooting
+      sendMessage("Give me suggestions based on what I've eaten today.", logs, macros);
+    }
+  }, [isOpen, logsReady]);
+
+  // Reset when panel closes so it re-fires on next open
+  useEffect(() => {
+    if (!isOpen) {
+      hasAutoSent.current = false;
+      setMessages([]);
+    }
   }, [isOpen]);
 
-  const sendMessage = async (text: string, currentLogs = logsRef.current, currentMacros = macrosRef.current) => {
+  const sendMessage = async (text: string, currentLogs = logs, currentMacros = macros) => {
     const userMessage: Message = { role: 'user', content: text };
     const updatedMessages = [...messages, userMessage];
     setMessages(updatedMessages);
@@ -168,6 +184,18 @@ export default function AISuggestions({ macros, logs, isOpen, onClose }: Props) 
         </div>
 
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+          {!logsReady && (
+            <div className="flex justify-start">
+              <div className="bg-stone-800 rounded-2xl px-4 py-3">
+                <div className="flex gap-1">
+                  <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-1.5 h-1.5 bg-stone-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+              </div>
+            </div>
+          )}
+
           {messages.map((msg, i) => (
             <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${

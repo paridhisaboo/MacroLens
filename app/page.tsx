@@ -104,8 +104,6 @@ function FoodModal({ food, onClose, onAdd }: {
             <p className="text-xs font-mono text-stone-400 uppercase tracking-widest mb-1">Add to log</p>
             <h2 className="font-semibold text-stone-900 leading-snug">{food.description}</h2>
           </div>
-
-          {/* Macro grid */}
           <div className="grid grid-cols-4 gap-2">
             {[
               { label: 'Cal', value: Math.round(food.calories * scale), unit: 'kcal' },
@@ -119,8 +117,6 @@ function FoodModal({ food, onClose, onAdd }: {
               </div>
             ))}
           </div>
-
-          {/* Serving slider */}
           <div className="space-y-2">
             <label className="text-xs font-mono text-stone-500 uppercase tracking-widest">Serving size</label>
             <div className="flex items-center gap-3">
@@ -134,8 +130,6 @@ function FoodModal({ food, onClose, onAdd }: {
               </div>
             </div>
           </div>
-
-          {/* Full details toggle */}
           <button
             onClick={() => setShowDetail(!showDetail)}
             className="w-full py-2 rounded-xl border border-stone-200 text-sm text-stone-600 hover:bg-stone-50 transition-colors flex items-center justify-center gap-2"
@@ -147,8 +141,6 @@ function FoodModal({ food, onClose, onAdd }: {
               </span>
             ) : showDetail ? '▲ Hide full nutrition' : '▼ Full nutrition info'}
           </button>
-
-          {/* Detail panel */}
           {showDetail && detail && (
             <div className="bg-stone-50 rounded-xl p-4 space-y-1">
               {detail.category && (
@@ -164,7 +156,6 @@ function FoodModal({ food, onClose, onAdd }: {
               <NutrientRow label="Vitamin C" value={detail.nutrients.vitaminC ? Math.round(detail.nutrients.vitaminC * scale * 10) / 10 : null} unit="mg" />
             </div>
           )}
-
           <div className="flex gap-2 pt-1">
             <button onClick={onClose}
               className="flex-1 py-2.5 rounded-xl border border-stone-200 text-sm text-stone-600 hover:bg-stone-50 transition-colors">
@@ -195,21 +186,17 @@ function BarcodeScanner({ onResult, onClose }: {
 
   useEffect(() => {
     let reader: any = null
-
     async function start() {
       try {
         const { BrowserMultiFormatReader } = await import('@zxing/library')
         reader = new BrowserMultiFormatReader()
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }
-        })
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
         streamRef.current = stream
         if (videoRef.current) {
           videoRef.current.srcObject = stream
           await videoRef.current.play()
         }
         setStatus('scanning')
-
         reader.decodeFromVideoElement(videoRef.current, async (result: any, err: any) => {
           if (result) {
             setStatus('found')
@@ -231,7 +218,6 @@ function BarcodeScanner({ onResult, onClose }: {
         setErrorMsg(e.message ?? 'Camera access denied')
       }
     }
-
     start()
     return () => { reader?.reset(); stopCamera() }
   }, [onResult, stopCamera])
@@ -245,7 +231,6 @@ function BarcodeScanner({ onResult, onClose }: {
       </div>
       <div className="flex-1 relative flex items-center justify-center">
         <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
-        {/* Viewfinder overlay */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-64 h-40 border-2 border-white/60 rounded-xl relative">
             <div className="absolute -top-0.5 -left-0.5 w-6 h-6 border-t-4 border-l-4 border-white rounded-tl-lg" />
@@ -385,7 +370,6 @@ export default function Home() {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-        {/* Macro rings */}
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100">
           <p className="text-xs font-mono text-stone-400 uppercase tracking-widest mb-5">Today's macros</p>
           <div className="flex justify-around">
@@ -402,7 +386,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Search */}
         <div className="space-y-3">
           <div className="relative">
             <input
@@ -418,7 +401,6 @@ export default function Home() {
               </div>
             )}
           </div>
-
           {results.length > 0 && query.length >= 2 && (
             <div className="bg-white border border-stone-100 rounded-2xl shadow-sm overflow-hidden">
               {results.map((food, i) => (
@@ -435,7 +417,6 @@ export default function Home() {
           )}
         </div>
 
-        {/* Food log */}
         <div className="space-y-2">
           <p className="text-xs font-mono text-stone-400 uppercase tracking-widest px-1">Food log</p>
           {logs.length === 0 ? (
@@ -486,15 +467,7 @@ export default function Home() {
           targetCarbs: targets.carbs,
           targetFat: targets.fat,
         }}
-        logs={logs.map(l => ({
-          foodName: l.foodName,
-          macros: {
-            calories: l.calories,
-            protein: l.protein,
-            carbs: l.carbs,
-            fat: l.fat,
-          },
-        }))}
+        logData={logData}
         isOpen={showAI}
         onClose={() => setShowAI(false)}
       />
