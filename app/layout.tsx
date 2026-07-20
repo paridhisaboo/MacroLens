@@ -1,10 +1,16 @@
 import type { Metadata } from 'next'
-import { DM_Sans, DM_Mono } from 'next/font/google'
+import { Fraunces, Inter, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 import Providers from './providers'
 
-const dmSans = DM_Sans({ variable: '--font-sans', subsets: ['latin'] })
-const dmMono = DM_Mono({ variable: '--font-mono', weight: ['400', '500'], subsets: ['latin'] })
+const fraunces = Fraunces({
+  variable: '--font-display',
+  subsets: ['latin'],
+  style: ['normal', 'italic'],
+  weight: ['400', '500', '600'],
+})
+const inter = Inter({ variable: '--font-sans', subsets: ['latin'] })
+const jetbrainsMono = JetBrains_Mono({ variable: '--font-mono', weight: ['400', '500'], subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'MacroLens',
@@ -13,7 +19,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${dmSans.variable} ${dmMono.variable}`}>
+    <html lang="en" className={`${fraunces.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
       <body className="min-h-screen bg-stone-50 text-stone-900 font-sans antialiased">
         <Providers>{children}</Providers>
       </body>

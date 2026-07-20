@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
-
-const DEMO_USER_ID = 'demo-user'
+import { auth } from '@/lib/auth'
 
 const logSchema = z.object({
   foodName: z.string(),
@@ -14,20 +13,11 @@ const logSchema = z.object({
   source: z.enum(['usda', 'barcode', 'manual']),
 })
 
-// Ensure demo user exists
-async function ensureUser() {
-  return prisma.user.upsert({
-    where: { id: DEMO_USER_ID },
-    update: {},
-    create: {
-      id: DEMO_USER_ID,
-      email: 'demo@macrolens.app',
-    },
-  })
-}
-
 export async function GET(req: NextRequest) {
-  await ensureUser()
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
+
   const { searchParams } = new URL(req.url)
   const date = searchParams.get('date') ?? new Date().toISOString().split('T')[0]
 
@@ -36,28 +26,41 @@ export async function GET(req: NextRequest) {
   end.setDate(end.getDate() + 1)
 
   const logs = await prisma.foodLog.findMany({
-    where: { userId: DEMO_USER_ID, loggedAt: { gte: start, lt: end } },
+    where: { userId, loggedAt: { gte: start, lt: end } },
     orderBy: { loggedAt: 'desc' },
   })
   return NextResponse.json({ logs })
 }
 
 export async function POST(req: NextRequest) {
-  await ensureUser()
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
+
   const body = await req.json()
   const parsed = logSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid data' }, { status: 400 })
 
   const log = await prisma.foodLog.create({
-    data: { ...parsed.data, userId: DEMO_USER_ID },
+    data: { ...parsed.data, userId },
   })
   return NextResponse.json({ log })
 }
 
 export async function DELETE(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
+
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
-  await prisma.foodLog.delete({ where: { id } })
+
+  // Scope the delete to the caller's own userId so one user can never
+  // delete another user's log entries, even by guessing/enumerating ids.
+  const result = await prisma.foodLog.deleteMany({ where: { id, userId } })
+  if (result.count === 0) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
   return NextResponse.json({ ok: true })
 }

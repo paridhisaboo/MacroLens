@@ -1,12 +1,64 @@
 @import "tailwindcss";
 
 :root {
-  --font-sans: 'DM Sans', sans-serif;
-  --font-mono: 'DM Mono', monospace;
+  --font-sans: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-display: 'Fraunces', serif;
+}
+
+/* Dark theme, forest-green accent. Overriding the underlying stone and teal
+   color scales means every existing utility class across the codebase that
+   uses those names repaints from here automatically -- no per-component
+   edits needed for the color values themselves. */
+@theme {
+  --color-stone-50: #F8F6EF;
+  --color-stone-100: #F1EEE2;
+  --color-stone-200: #E3DFCF;
+  --color-stone-300: #CFC9B4;
+  --color-stone-400: #A39C82;
+  --color-stone-500: #837A5F;
+  --color-stone-600: #695F45;
+  --color-stone-700: #4F4732;
+  --color-stone-800: #362F20;
+  --color-stone-900: #1E1911;
+  --color-stone-950: #100E09;
+
+  /* Forest green accent family */
+  --color-teal-50: #EAF5EE;
+  --color-teal-100: #D3EBDB;
+  --color-teal-200: #A8D7B8;
+  --color-teal-300: #7CC395;
+  --color-teal-400: #56A876;
+  --color-teal-500: #3D8B5C;
+  --color-teal-600: #2F6B4A;
+  --color-teal-700: #24533A;
+  --color-teal-800: #1A3D2A;
+  --color-teal-900: #12291D;
+  --color-teal-950: #0B1912;
+
+  /* Macro accents: brightened slightly so they stay legible on dark cards */
+  --color-macro-calories: #56A876;
+  --color-macro-protein: #6FA8FF;
+  --color-macro-carbs: #E8C468;
+  --color-macro-fat: #FF8A75;
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-display: var(--font-display);
 }
 
 * { box-sizing: border-box; }
 
 body {
   font-family: var(--font-sans);
+}
+
+::selection {
+  background: var(--color-teal-600);
+  color: var(--color-stone-50);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-teal-400);
+  outline-offset: 2px;
 }

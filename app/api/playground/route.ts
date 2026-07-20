@@ -1,8 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { PROMPT_STRATEGIES, type PromptContext, type SuggestionScore } from '@/lib/tokens';
 
-export const runtime = 'edge';
-
 const client = new Anthropic();
 const MODEL_ID = 'claude-haiku-4-5';
 

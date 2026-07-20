@@ -7,14 +7,66 @@ datasource db {
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
-  dailyCalories Int      @default(2000)
-  dailyProtein  Float    @default(150)
-  dailyCarbs    Float    @default(250)
-  dailyFat      Float    @default(65)
-  createdAt     DateTime @default(now())
-  logs          FoodLog[]
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  dailyCalories Int       @default(2000)
+  dailyProtein  Float     @default(150)
+  dailyCarbs    Float     @default(250)
+  dailyFat      Float     @default(65)
+  heightCm      Float?
+  weightKg      Float?
+  createdAt     DateTime  @default(now())
+
+  // Bring-your-own-key: each user's Anthropic API key, encrypted at rest.
+  // Never sent back to the client in plaintext.
+  anthropicApiKeyEncrypted String?
+  // Free trial calls against the app's own Anthropic key before a user
+  // must supply their own. Decremented on each AI call that falls back
+  // to the app key.
+  aiTrialUsesRemaining     Int     @default(5)
+
+  logs     FoodLog[]
+  accounts Account[]
+  sessions Session[]
+}
+
+// --- Auth.js (NextAuth v5) Prisma adapter models ---
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
 }
 
 model FoodLog {
