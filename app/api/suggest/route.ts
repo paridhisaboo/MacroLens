@@ -2,8 +2,6 @@ import { streamText } from 'ai';
 import { anthropic } from '@ai-sdk/anthropic';
 import { encodeUsageMarker } from '@/lib/tokens';
 
-export const runtime = 'edge';
-
 const MODEL_ID = 'claude-haiku-4-5';
 
 interface LogEntry {

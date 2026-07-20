@@ -1,7 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-export const runtime = 'edge';
-
 const client = new Anthropic();
 
 export interface SuggestionScore {
