@@ -186,51 +186,81 @@ function BarcodeScanner({ onResult, onClose }: {
   onResult: (food: Food) => void; onClose: () => void
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
-  const [status, setStatus] = useState<'starting' | 'scanning' | 'error' | 'found'>('starting')
-  const [errorMsg, setErrorMsg] = useState('')
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const readerRef = useRef<any>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const [status, setStatus] = useState<'starting' | 'ready' | 'processing' | 'not_found' | 'error' | 'found'>('starting')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const stopCamera = useCallback(() => {
     streamRef.current?.getTracks().forEach(t => t.stop())
   }, [])
 
+  // Camera just starts and stays live for aiming — no per-frame decoding here.
   useEffect(() => {
-    let reader: any = null
     async function start() {
       try {
         const { BrowserMultiFormatReader } = await import('@zxing/library')
-        reader = new BrowserMultiFormatReader()
+        readerRef.current = new BrowserMultiFormatReader()
         const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
         streamRef.current = stream
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          await videoRef.current.play()
-        }
-        setStatus('scanning')
-        reader.decodeFromVideoElement(videoRef.current, async (result: any, err: any) => {
-          if (result) {
-            setStatus('found')
-            reader?.reset()
-            stopCamera()
-            const code = result.getText()
-            const res = await fetch(`/api/barcode?code=${code}`)
-            const data = await res.json()
-            if (data.found) {
-              onResult(data.food)
-            } else {
-              setStatus('error')
-              setErrorMsg(`Barcode ${code} not found in database`)
-            }
-          }
+        if (!videoRef.current) return
+        videoRef.current.srcObject = stream
+        // Wait for the video to actually have a frame ready before playing —
+        // calling play() immediately after setting srcObject can silently
+        // no-op on some browsers, leaving the element black.
+        await new Promise<void>((resolve) => {
+          if (!videoRef.current) return resolve()
+          videoRef.current.onloadedmetadata = () => resolve()
         })
+        try {
+          await videoRef.current.play()
+        } catch (playErr) {
+          console.error('Video play() failed:', playErr)
+        }
+        setStatus('ready')
       } catch (e: any) {
         setStatus('error')
         setErrorMsg(e.message ?? 'Camera access denied')
       }
     }
     start()
-    return () => { reader?.reset(); stopCamera() }
-  }, [onResult, stopCamera])
+    return () => { readerRef.current?.reset(); stopCamera() }
+  }, [stopCamera])
+
+  // Runs once, only when the user taps the capture button — decodes a single
+  // still frame instead of running zxing continuously on every video frame.
+  const capturePhoto = useCallback(async () => {
+    if (!videoRef.current || !canvasRef.current || !readerRef.current) return
+    if (status === 'processing') return
+    setStatus('processing')
+
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    canvas.width = video.videoWidth
+    canvas.height = video.videoHeight
+    canvas.getContext('2d')?.drawImage(video, 0, 0, canvas.width, canvas.height)
+    const dataUrl = canvas.toDataURL('image/png')
+
+    try {
+      const result = await readerRef.current.decodeFromImageUrl(dataUrl)
+      const code = result.getText()
+      stopCamera()
+      const res = await fetch(`/api/barcode?code=${code}`)
+      const data = await res.json()
+      if (data.found) {
+        setStatus('found')
+        onResult(data.food)
+      } else {
+        setStatus('not_found')
+        setErrorMsg(`Barcode ${code} not found in database`)
+      }
+    } catch (e: any) {
+      // Camera stays live — nothing decodable in that frame, let them retake.
+      setStatus('not_found')
+      setErrorMsg('No barcode detected — center it in the frame and try again')
+    }
+  }, [status, onResult, stopCamera])
 
   return (
     <div className="fixed inset-0 bg-stone-950 flex flex-col z-50">
@@ -241,6 +271,7 @@ function BarcodeScanner({ onResult, onClose }: {
       </div>
       <div className="flex-1 relative flex items-center justify-center">
         <video ref={videoRef} className="w-full h-full object-cover" muted playsInline />
+        <canvas ref={canvasRef} className="hidden" />
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-64 h-40 border-2 border-teal-300/70 rounded-xl relative">
             <div className="absolute -top-0.5 -left-0.5 w-6 h-6 border-t-4 border-l-4 border-teal-300 rounded-tl-lg" />
@@ -255,6 +286,19 @@ function BarcodeScanner({ onResult, onClose }: {
               <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-3" />
               <p className="text-sm">Starting camera…</p>
             </div>
+          </div>
+        )}
+        {status === 'processing' && (
+          <div className="absolute inset-0 bg-stone-950/60 flex items-center justify-center">
+            <div className="text-white text-center">
+              <div className="w-8 h-8 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-sm">Reading barcode…</p>
+            </div>
+          </div>
+        )}
+        {status === 'not_found' && (
+          <div className="absolute inset-x-0 bottom-24 flex items-center justify-center px-6">
+            <p className="text-macro-fat text-xs bg-stone-950/80 rounded-lg px-3 py-2 text-center">{errorMsg}</p>
           </div>
         )}
         {status === 'error' && (
@@ -275,8 +319,19 @@ function BarcodeScanner({ onResult, onClose }: {
           </div>
         )}
       </div>
-      <div className="p-4 text-center">
-        <p className="text-white/50 text-xs">Point camera at a barcode</p>
+      <div className="p-4 flex flex-col items-center gap-3">
+        {(status === 'ready' || status === 'not_found' || status === 'processing') && (
+          <button
+            onClick={capturePhoto}
+            disabled={status === 'processing'}
+            className="w-16 h-16 rounded-full bg-white disabled:opacity-50 border-4 border-white/30 active:scale-95 transition-transform"
+            aria-label="Take photo to scan barcode"
+          />
+        )}
+        <p className="text-white/50 text-xs">
+          {status === 'not_found' ? 'Tap to try again' : 'Center the barcode and tap to capture'}
+        </p>
+        <p className="text-white/30 text-[11px]">Only detects US/Canada food products</p>
       </div>
     </div>
   )
